@@ -4,7 +4,6 @@
 int LED_PIN  = D7;
 int SEND_PIN = D1;
 int RECV_PIN = D4;
-int TOGGLE_EMBERLIGHT_PIN = D6;
 int CAP_TIMEOUT = 10000;
 int CAP_THRESHOLD = 10;
 int OFF_STATE = 0;
@@ -13,7 +12,7 @@ int STATE_CHANGE_THRESHOLD = 2;
 int LOOP_DELAY_MILLIS = 50;
 String EMBERLIGHT_DEVICE_ID = "962a976a-1b58-49e9-9f97-85563d883ff3";
 
-int checkTouchSensor();
+int checkTouchSensor(int threshold);
 void toggleLed();
 void turnLedOn();
 void turnLedOff();
@@ -22,35 +21,36 @@ void turnEmberlightOn();
 void turnEmberlightOff();
 void changeEmberlightDeviceState(char state[]);
 
-int touchState = 0;
-int lastTouchState = 0;
-int ledState = 0;
-int deviceState = 0;
+int touchState = OFF_STATE;
+int ledState = OFF_STATE;
+int deviceState = OFF_STATE;
 int stateChangeCounter = 0;
 TCPClient client;
 
 void setup()
 {
   pinMode(LED_PIN, OUTPUT);
-  pinMode(TOGGLE_EMBERLIGHT_PIN, INPUT_PULLDOWN);
   Serial.begin(9600);
 }
 
 
 void loop()
 {
-  touchState = checkTouchSensor();
-  if(touchState != lastTouchState && touchState == ON_STATE) {
-    int useEmberlight = digitalRead(TOGGLE_EMBERLIGHT_PIN);
-    Serial.print("Use Emberlight: ");
-    Serial.print(useEmberlight);
+  //This is the number of reads necessary to trigger a 'touch'.
+  //*****YOU SHOULD REPLACE THIS VALUE*****//
+  int touchThreshold = 0;
+  //*****YOU SHOULD REPLACE THIS VALUE*****//
+
+  //Check the touch sensor.
+  int newTouchState = checkTouchSensor(touchThreshold);
+
+  //Check to see if our touch state just changed from OFF to ON.
+  //If so, we'll toggle the LED.
+  if(newTouchState != touchState && newTouchState == ON_STATE) {
     toggleLed();
-    if(useEmberlight == HIGH) {
-      toggleEmberlight();
-    }
   }
 
-  lastTouchState = touchState;
+  touchState = newTouchState;
 }
 
 
@@ -73,10 +73,7 @@ void loop()
 
 
 
-
-
-
-int checkTouchSensor()
+int checkTouchSensor(int threshold)
 {
   int result = -1;
   int counter = 0;
@@ -85,8 +82,8 @@ int checkTouchSensor()
   pinMode(SEND_PIN, OUTPUT);
   pinMode(RECV_PIN, INPUT);
 
-  digitalWrite(SEND_PIN, HIGH);
 
+  digitalWrite(SEND_PIN, HIGH);
   while(recvValue == LOW && counter < CAP_TIMEOUT) {
     counter++;
     recvValue = digitalRead(RECV_PIN);
@@ -94,21 +91,11 @@ int checkTouchSensor()
 
   digitalWrite(SEND_PIN, LOW);
   delay(LOOP_DELAY_MILLIS);
-
   Serial.println(counter);
 
-  if(counter > CAP_THRESHOLD) {
+  if(counter > threshold) {
     stateChangeCounter = 0;
     result = ON_STATE;
-    /*
-    if(touchState == ON_STATE) {
-      stateChangeCounter = 0;
-      result = ON_STATE;
-    }
-    else {
-      stateChangeCounter++;
-    }
-    */
   }
   else {
     if(touchState == OFF_STATE) {
